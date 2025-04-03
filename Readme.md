@@ -22,31 +22,19 @@ Developed by Tamir Mhabary
 
 The project is organized as follows:
 ```
-BlePerepherial/
-├── src/                
-│   └── main.cpp         # Main application code
-├── lib/                
-│   ├── BLEServerManager/
-│   │   ├── BLEServerManager.cpp # BLE server management logic
-│   │   └── BLEServerManager.h   # BLE server management header             
-│   ├── decode_packet/
-│   │   └── decode_packet.h      # Packet decoding logic
-│   ├── deep_sleep/
-│   │   └── deep_sleep.h         # Deep sleep functionality
-│   ├── global_vars/
-│   │   └── global_var.h         # Global variables
-│   ├── ble_multi_Client/
-│   │   └── ble_multi_client.h   # BLE multi-client logic
-│   ├── websocket_server/
-│   │   └── websocket_server.h   # WebSocket server logic
-│   └── IR/                      
-│       └── ir.h                 # IR-related functionality
-├── 3d/                
-│   ├── case_bottom.STL          # STL file for the bottom part of the case
-│   ├── case_up.STL              # STL file for the upper part of the case
-│   ├── Case_w_out_top.png       # Image of the case without the top
-│   └── Case.png                 # Image of the complete case
-└── Readme.md                    # Project documentation
+data/
+├── index.html                # Web interface for the WebSocket server
+lib/
+├── ble_multi_Client/
+│   ├── ble_multi_client.cpp  # BLE multi-client implementation
+│   └── ble_multi_client.h    # BLE multi-client header
+├── websocket_server/
+│   └── websocket_server.h    # WebSocket server logic
+src/
+├── main.cpp                  # Main application code
+platformio.ini                # PlatformIO configuration file
+Readme.md                     # Project documentation
+.gitignore                    # Git ignore file
 ```
 
 ## 3D Printed Parts
