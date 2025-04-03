@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <websocket_server.h>
 
 ESP32WebSocketServer socket_server("Galaxy", "pnml6201");

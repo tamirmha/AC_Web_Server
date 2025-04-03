@@ -11,8 +11,6 @@ public:
     explicit ScanCallbacks(BLEClientMulti* parent) : _parent(parent) {}
 
     void onResult(const NimBLEAdvertisedDevice* advertisedDevice) override {
-//        Serial.print("Advertised Device found: ");
-//        Serial.println(advertisedDevice->getAddress().toString().c_str());
         _parent->doConnect = true;
         _parent->MyAdvertisedDevice = const_cast<NimBLEAdvertisedDevice*>(advertisedDevice);
     }
@@ -27,8 +25,8 @@ private:
 
 class ClientCallbacks : public NimBLEClientCallbacks {
 public:
-//    ClientCallbacks(BLEClientMulti* parent) : _parent(parent) {}
-    ClientCallbacks()= default;
+//    ClientCallbacks()= default;
+    explicit ClientCallbacks(BLEClientMulti* parent) : _parent(parent){}
 
     void onConnect(NimBLEClient* pClient) override {
         Serial.println("Connected to the server.");
@@ -36,11 +34,10 @@ public:
 
     void onDisconnect(NimBLEClient* pClient, int reason) override {
         Serial.println("Disconnected from the server.");
-        BLEClientMulti::onPeripheralDisconnected(pClient);
+        _parent->onPeripheralDisconnected(pClient);
     }
-
-//private:
-//    BLEClientMulti* _parent;
+private:
+    BLEClientMulti* _parent;
 };
 
 void BLEClientMulti::addTargetDevice(const std::string& identifier) {
@@ -81,14 +78,14 @@ NimBLEClient* BLEClientMulti::getClientForDamper(int damperIndex) const {
             return nullptr;
     }
 }
+
 void BLEClientMulti::connectToDevice() {
     if (isTargetDevice(MyAdvertisedDevice)) {
         Serial.println("BLE Target device found.");
         NimBLEClient* pClient;
         pClient = NimBLEDevice::createClient();
-//        pClient->setClientCallbacks(new ClientCallbacks(this)); // Set client callbacks
-        pClient->setClientCallbacks(new ClientCallbacks()); // Set client callbacks
-        if (pClient->connect(MyAdvertisedDevice)) {
+        pClient->setClientCallbacks(new ClientCallbacks(this)); // Set client callbacks
+        if (pClient->connect(MyAdvertisedDevice, true)) {
             Serial.println("Connected to BLE peripheral.");
             NimBLERemoteService* pRemoteService = pClient->getService(SERVICE_UUID);
 
@@ -123,5 +120,11 @@ bool BLEClientMulti::isTargetDevice(NimBLEAdvertisedDevice* advertisedDevice) {
 // New method to handle peripheral disconnection
 void BLEClientMulti::onPeripheralDisconnected(NimBLEClient* pClient) {
     Serial.println("Handling peripheral disconnection...");
+    pClient->disconnect();
     NimBLEDevice::deleteClient(pClient);
+
+    if (pClient == acClient) acClient = nullptr;
+    else if (pClient == d1Client) d1Client = nullptr;
+    else if (pClient == d2Client) d2Client = nullptr;
+    else if (pClient == d3Client) d3Client = nullptr;
 }

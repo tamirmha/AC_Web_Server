@@ -13,7 +13,6 @@
 #define NUMPIXELS 1
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
-//const char* hostname = "ESP_SERVER";
 
 void WiFiEvent(WiFiEvent_t event) {
     switch (event) {
@@ -36,6 +35,19 @@ void WiFiEvent(WiFiEvent_t event) {
             break;
         default:
             break;
+    }
+}
+
+void BLEEvent(bool connected) {
+    // Turn On the blue led when no BLE connected
+    if (connected) {
+        pixels.setPixelColor(0, Adafruit_NeoPixel::Color(0, 0, 0)); // None
+        pixels.show();
+        pixels.clear();
+    } else {
+        // Blue light when BLE Not connected
+        pixels.setPixelColor(0, Adafruit_NeoPixel::Color(0, 0, 255)); // Blue
+        pixels.show();
     }
 }
 
@@ -199,6 +211,10 @@ public:
             bleClient.notified = false;
             bleClient.notifty_index = -1;
         }
+        if (!bleClient.isConnected())   BLEEvent(false);
+        else if (bleClient.isConnected())  BLEEvent(true);
+        else Serial.println("Strange");
+
         delay(50);  // Required for ESP32 to run properly
     }
 
@@ -223,7 +239,6 @@ public:
                 Serial.println("Characteristic NOT found!");
         } else
             Serial.println("Service NOT found!");
-
     }
 
 private:
@@ -345,3 +360,4 @@ private:
 };
 
 #endif // WEBSOCKET_SERVER_H
+

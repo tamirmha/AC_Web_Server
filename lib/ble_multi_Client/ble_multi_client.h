@@ -15,7 +15,7 @@
 #define STATE_UUID "5678abcd-0003-1000-8000-00805f9b34fb"
 #define TEMP_UUID "5678abcd-0004-1000-8000-00805f9b34fb"
 #define VOLTAGE_UUID "5678abcd-0005-1000-8000-00805f9b34fb"
-const std::vector<std::string> CHARACTERISTIC_UUIDS = {VENT_SPEED_UUID, MODE_UUID, STATE_UUID, TEMP_UUID, VOLTAGE_UUID};
+//const std::vector<std::string> CHARACTERISTIC_UUIDS = {VENT_SPEED_UUID, MODE_UUID, STATE_UUID, TEMP_UUID, VOLTAGE_UUID};
 
 static const char* AC_MAC = "9c:9e:6e:c1:0c:5e";
 static const char* DUMPER1_MAC = "9c:9e:6e:c1:09:e2";  // Parents room
@@ -66,6 +66,7 @@ public:
     static bool notified;
     static std::string per_voltage;
     static int notifty_index;
+//    bool clientConnected = false;  // Flag to check if at least one client is connected
 
     BLEClientMulti();
     void init();
@@ -73,8 +74,14 @@ public:
     void startScanning() const;
     void connectToDevice();
     bool isTargetDevice(NimBLEAdvertisedDevice* advertisedDevice);
-    static void onPeripheralDisconnected(NimBLEClient* pClient);
-    NimBLEClient* getClientForDamper(int damperIndex) const ;
+    void onPeripheralDisconnected(NimBLEClient* pClient);
+    NimBLEClient* getClientForDamper(int damperIndex) const;
+
+    bool isConnected() const {
+        return (acClient && acClient->isConnected()) || (d1Client && d1Client->isConnected()) ||
+               (d2Client && d2Client->isConnected()) || (d3Client && d3Client->isConnected());
+    }
+
 };
 
 #endif
