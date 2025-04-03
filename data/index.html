@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Control</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #e0e0e0;
+        }
+        .section {
+            margin-bottom: 30px;
+            font-size: 20px;
+        }
+        .vent-power-select, .ac-temp-select {
+            width: 90px;
+            height: 30px;
+            font-size: 18px;
+        }
+        .mode-select {
+            width: 100px;
+            height: 30px;
+            font-size: 18px;
+            transition: background-color 0.3s ease;
+        }
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ac-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .ac-row div {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .ac-row div:last-child {
+            margin-right: 0;
+        }
+        .ac-row, .button-row {
+            margin-bottom: 20px; /* Adds space below each row */
+        }
+         /* Adjust the button size and text size */
+         button {
+            padding: 10px 20px; /* Increase padding for larger button size */
+            font-size: 18px;    /* Increase the text size */
+            border-radius: 5px;
+            background-color:  #6e2f37;
+            color: rgb(19, 21, 121);
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Adjust the button size when in ON state */
+        button.on {
+            background-color: #4CAF50;
+        }
+
+        /* Adjust the button size when in OFF state */
+        button.off {
+            background-color: #a83076;
+        }
+
+        button:hover {
+            opacity: 0.8;
+        }
+    </style>
+    <script>
+        const dampers = ["damper1", "damper2", "damper3"]; // Add more dampers as needed
+        let ws = new WebSocket('ws://' + location.host + ':81');
+
+        function toggleButton(damper) {
+            let button = document.getElementById(damper);
+            ws.send(`toggle_${damper}`);  // Send toggle command
+
+            // The server will send confirmation, so we update state only when we receive it
+        }
+
+        function toggleAC() {
+            let acButton = document.getElementById('ac');
+            ws.send('toggle_ac');  // Send toggle command for AC
+        }
+
+        ws.onmessage = function(event) {
+            let message = event.data;
+            console.log("Received:", message);
+            
+            // Process incoming status updates
+            let parts = message.split(":");
+            if (parts.length === 2 ) {  //&& parts[0].startsWith("status_")
+                let device = parts[0].trim();
+                let status = parts[1].trim();
+                if (device.startsWith("status_damper")) {
+                    let damperIndex = device.replace("status_damper", "");
+                    updateButtonState("damper" + damperIndex, status);
+                } else if (device === "status_ac") {
+                    updateButtonState("ac", status);
+                } else if (device.startsWith("power_damper")) {
+                    let damperIndex = device.replace("power_damper", "");
+                    updatePowerState("damper" + damperIndex, status);
+                } else if (device === "power_ac") {
+                    updatePowerState("ac", status);
+                } else if (device === "ac_mode") {
+                    updateACMode(status);
+                } else if (device === "ac_temp") {
+                    updateACTemperature(status);
+                }
+                else if (device.startsWith("voltage_")) {
+                    let id = device.replace("voltage_", "");
+                    updateVoltageDisplay(id, status);
+                }
+                // else
+                //     updateButtonState(device, status);
+            }
+        };
+
+        function updateVoltageDisplay(device, voltage) {
+            let voltageElement = document.getElementById(`voltage_${device}`);
+            if (voltageElement)
+                voltageElement.textContent = `Voltage: ${voltage}V`;
+        }
+        function updateButtonState(device, status) {
+            let button = document.getElementById(device);
+            if (!button) return;
+
+            if (status === "on") {
+                button.classList.remove("off");
+                button.classList.add("on");
+                button.textContent = "On";
+            } else {
+                button.classList.remove("on");
+                button.classList.add("off");
+                button.textContent = "Off";
+            }
+        }
+
+        window.onload = function() {
+            const acSection = document.createElement('div');
+            acSection.classList.add('section');
+            const acTitle = document.createElement('h3');
+            acTitle.textContent = 'Air Conditioner';
+            acSection.appendChild(acTitle);
+
+            // Create first row (On/Off button and Power control)
+            const acRow1 = document.createElement('div');
+            acRow1.classList.add('ac-row');
+
+            const acButton = document.createElement('button');
+            acButton.id = 'ac';
+            acButton.classList.add('off');
+            acButton.textContent = 'Off';
+            acButton.onclick = toggleAC;
+            acRow1.appendChild(acButton);
+
+            const acPowerSelect = document.createElement('select');
+            acPowerSelect.classList.add('vent-power-select');
+            acPowerSelect.id = 'power_ac';
+            acPowerSelect.onchange = function() { setACPower(acPowerSelect.value); };
+            acPowerSelect.innerHTML = `
+            <option value="po_low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="p_high">High</option>
+            <option value="p_auto">Auto</option>
+    `;
+            acRow1.appendChild(acPowerSelect);
+
+            acSection.appendChild(acRow1);
+
+            // Create second row (Mode and Temperature control)
+            const acRow2 = document.createElement('div');
+            acRow2.classList.add('ac-row');
+
+            const acModeSelect = document.createElement('select');
+            acModeSelect.id = 'ac_mode';
+            acModeSelect.classList.add('mode-select');
+            acModeSelect.onchange = function() { setACMode(acModeSelect.value); changeACBackground(acModeSelect); };
+            acModeSelect.innerHTML = `
+        <option value="cool">Cool</option>
+        <option value="heat">Heat</option>
+    `;
+            acModeSelect.style.backgroundColor = '#0941da';
+            acRow2.appendChild(acModeSelect);
+
+            const acTempSelect = document.createElement('select');
+            acTempSelect.id = 'ac_temp';
+            acTempSelect.classList.add('ac-temp-select');
+            acTempSelect.onchange = function() { setACTemperature(acTempSelect.value); };
+            acTempSelect.innerHTML = Array.from({ length: 15 }, (_, i) => `<option value="${i + 16}">${i + 16}</option>`).join('');
+            acRow2.appendChild(acTempSelect);
+
+            acSection.appendChild(acRow2);
+
+            // Add voltage display for AC
+            const acVoltageDisplay = document.createElement('div');
+            acVoltageDisplay.id = 'voltage_ac';
+            acVoltageDisplay.textContent = 'Voltage: N/A';
+            acSection.appendChild(acVoltageDisplay);
+
+            document.getElementById('controls-container').appendChild(acSection);
+
+            // Create dampers section
+            const dampersContainer = document.getElementById('dampers-container');
+
+            dampers.forEach(damper => {
+                const damperSection = document.createElement('div');
+                damperSection.classList.add('section');
+                const damperTitle = document.createElement('h3');
+                damperTitle.textContent = `${damper.charAt(0).toUpperCase() + damper.slice(1)}`;
+                damperSection.appendChild(damperTitle);
+
+                const buttonRow = document.createElement('div');
+                buttonRow.classList.add('button-row');
+
+                const damperButton = document.createElement('button');
+                damperButton.id = damper;
+                damperButton.classList.add('off');
+                damperButton.textContent = 'Off';
+                damperButton.onclick = function() { toggleButton(damper); };
+                buttonRow.appendChild(damperButton);
+
+                const ventPowerSelect = document.createElement('select');
+                ventPowerSelect.id = 'power_' + damper ;
+                ventPowerSelect.classList.add('vent-power-select');
+                ventPowerSelect.onchange = function() { setDamperPower(damper, ventPowerSelect.value); };
+                ventPowerSelect.innerHTML = `
+            <option value="po_low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="p_high">High</option>
+            <option value="p_auto">Auto</option>
+        `;
+                buttonRow.appendChild(ventPowerSelect);
+
+                damperSection.appendChild(buttonRow);
+
+                // Add voltage display for damper
+                const damperVoltageDisplay = document.createElement('div');
+                damperVoltageDisplay.id = `voltage_${damper}`;
+                damperVoltageDisplay.textContent = 'Voltage: N/A';
+                damperSection.appendChild(damperVoltageDisplay);
+
+                dampersContainer.appendChild(damperSection);
+            });
+        };
+
+        function setDamperPower(damper, power) {
+            ws.send(`power_${damper}_${power}`); // Sends power level to the server
+        }
+
+        function setACPower(power) {
+            ws.send(`power_ac_${power}`); // Sends power level to the server
+        }
+
+        function setACMode(mode) {
+            ws.send(`set_ac_mode_${mode}`); // Sends mode (heat or cool)
+        }
+
+        function setACTemperature(temperature) {
+            ws.send(`set_ac_temp_${temperature}`); // Sends temperature to the server
+        }
+
+        function updatePowerState(device, powerState) {
+            let powerElement = document.getElementById(`power_${device}`);
+            if (powerElement)   powerElement.value = powerState;
+        }
+
+        function updateACMode(mode) {
+            let modeElement = document.getElementById('ac_mode');
+            if (modeElement)
+            {
+                modeElement.value = mode;
+                changeACBackground(modeElement);
+            }
+        }
+
+        function updateACTemperature(temp) {
+            let tempElement = document.getElementById('ac_temp');
+            if (tempElement)    tempElement.value = temp;
+        }
+
+        function changeACBackground(selectElement) {
+            if (selectElement.value === 'cool') 
+                selectElement.style.backgroundColor = '#0941da'; // Cool mode
+             else if (selectElement.value === 'heat') 
+                selectElement.style.backgroundColor = 'red';  // Heat mode
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h2>Smart Home Control</h2>
+        <div id="controls-container"></div> <!-- AC and Dampers will be dynamically added here -->
+        <div id="dampers-container"></div> <!-- Dampers section -->
+    </div>
+</body>
+</html>
