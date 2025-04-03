@@ -6,7 +6,8 @@
 #include <ESPAsyncWebServer.h>
 #include "ble_multi_client.h"
 #include <Adafruit_NeoPixel.h> 
-
+#include <nvs.h>
+#include <nvs_flash.h>
 
 #define PIN 48
 #define NUMPIXELS 1
@@ -38,26 +39,50 @@ void WiFiEvent(WiFiEvent_t event) {
     }
 }
 
-
-void saveState(const String& filename, const String& state) {
-    File file = SPIFFS.open(filename, FILE_WRITE);
-    if (!file) {
-        Serial.println("Failed to open file for writing");
+void saveState(const String& key, const String& state) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        Serial.println("Error opening NVS handle!");
         return;
     }
-    file.print(state);
-    file.close();
+    err = nvs_set_str(nvs_handle, key.c_str(), state.c_str());
+    if (err != ESP_OK) {
+        Serial.println("Error setting NVS value!");
+    }
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        Serial.println("Error committing NVS value!");
+    }
+    nvs_close(nvs_handle);
 }
 
-String loadState(const String& filename) {
-    File file = SPIFFS.open(filename, FILE_READ);
-    if (!file) {
-        Serial.println("Failed to open file for reading");
+String loadState(const String& key) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        Serial.println("Error opening NVS handle!");
         return "";
     }
-    String state = file.readString();
-    file.close();
-    return state;
+    size_t required_size;
+    err = nvs_get_str(nvs_handle, key.c_str(), NULL, &required_size);
+    if (err != ESP_OK) {
+        Serial.println("Error getting NVS value size!");
+        nvs_close(nvs_handle);
+        return "";
+    }
+    char* value = (char*)malloc(required_size);
+    err = nvs_get_str(nvs_handle, key.c_str(), value, &required_size);
+    if (err != ESP_OK) {
+        Serial.println("Error getting NVS value!");
+        free(value);
+        nvs_close(nvs_handle);
+        return "";
+    }
+    String result = String(value);
+    free(value);
+    nvs_close(nvs_handle);
+    return result;
 }
 
 void loadServerData(WebSocketsServer& webSocket)
@@ -65,32 +90,28 @@ void loadServerData(WebSocketsServer& webSocket)
     // Load and apply saved states
     for (int i = 0; i < 3; ++i)
     {
-        String damperState = loadState("/damper" + String(i + 1) + "_state.txt");
+        String damperState = loadState("damper" + String(i + 1) + "_state");
         if (damperState != "")  webSocket.broadcastTXT(damperState);
 
-        String damperPower = loadState("/damper" + String(i + 1) + "_power.txt");
+        String damperPower = loadState("damper" + String(i + 1) + "_power");
         if (damperPower != "") webSocket.broadcastTXT(damperPower);
-        Serial.println("Loaded states from SPIFFS:");
+        Serial.println("Loaded states from NVS:");
         Serial.println(damperState);
         Serial.println(damperPower);
     }
-    String acState = loadState("/ac_state.txt");
+    String acState = loadState("ac_state");
     if (acState != "")  webSocket.broadcastTXT(acState);
 
-    String acPower = loadState("/ac_power.txt");
+    String acPower = loadState("ac_power");
     if (acPower != "")   webSocket.broadcastTXT(acPower);
 
-    String acMode = loadState("/ac_mode.txt");
+    String acMode = loadState("ac_mode");
     if (acMode != "")  webSocket.broadcastTXT(acMode);
 
-    String acTemp = loadState("/ac_temp.txt");
+    String acTemp = loadState("ac_temp");
     if (acTemp != "")   webSocket.broadcastTXT(acTemp);
 
-//    bool result = webSocket.broadcastTXT(statusMessage);
-//    if (result) Serial.println("Message sent successfully");
-//    else        Serial.println("Failed to send message");
-
-    Serial.println("Loaded states from SPIFFS:");
+    Serial.println("Loaded states from NVS:");
     Serial.println(acTemp);
     Serial.println(acState);
     Serial.println(acPower);
@@ -108,6 +129,13 @@ public:
         Serial.begin(115200);
         Serial.println("Initializing WebSocket & BLE...");
     
+        esp_err_t err = nvs_flash_init();
+        if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+            ESP_ERROR_CHECK(nvs_flash_erase());
+            err = nvs_flash_init();
+        }
+        ESP_ERROR_CHECK(err);
+
         if (!SPIFFS.begin(false))
         { // Try mounting first
             Serial.println("SPIFFS mount failed! Formatting...");
@@ -224,8 +252,8 @@ private:
                 Serial.println(statusMessage.c_str());
                 NimBLEClient* pClient = bleClient.getClientForDamper(damperIndex+1);
                 sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(newState.c_str()));
-                // Save last value to SPIFFS
-                saveState("/damper" + String(damperIndex + 1) + "_state.txt", statusMessage);
+                // Save last value to NVS
+                saveState("damper" + String(damperIndex + 1) + "_state", statusMessage);
 
             }
         }
@@ -238,8 +266,8 @@ private:
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
             sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(newState.c_str()));
-            // Save last value to SPIFFS
-            saveState("/ac_state.txt", statusMessage);
+            // Save last value to NVS
+            saveState("ac_state", statusMessage);
         }
     
     }
@@ -258,8 +286,8 @@ private:
             webSocket.broadcastTXT(statusMessage);
             NimBLEClient* pClient = bleClient.getClientForDamper(damperIndex+1);
             sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(power_state.c_str()));
-            // Save last value to SPIFFS
-            saveState("/damper" + String(damperIndex + 1) + "_power.txt", statusMessage);
+            // Save last value to NVS
+            saveState("damper" + String(damperIndex + 1) + "_power", statusMessage);
         }
         else if  (message.startsWith("power_ac"))
         {
@@ -269,8 +297,8 @@ private:
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
             sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(power_state.c_str()));
-            // Save last value to SPIFFS
-            saveState("/ac_power.txt", statusMessage);
+            // Save last value to NVS
+            saveState("ac_power", statusMessage);
         }
     }
     void acMode(const String& message)
@@ -281,8 +309,8 @@ private:
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
         sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(mode.c_str()));
-        // Save last value to SPIFFS
-        saveState("/ac_mode.txt", statusMessage);
+        // Save last value to NVS
+        saveState("ac_mode", statusMessage);
     }
     void acTemp(const String& message)
     {
@@ -292,8 +320,8 @@ private:
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
         sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(temp.c_str()));
-        // Save last value to SPIFFS
-        saveState("/ac_temp.txt", statusMessage);
+        // Save last value to NVS
+        saveState("ac_temp", statusMessage);
     }
     void handleWebSocketMessage(uint8_t num, uint8_t* payload, size_t length) {
         String message = String((char*)payload);
