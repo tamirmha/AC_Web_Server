@@ -197,7 +197,6 @@ public:
         if (bleClient.notified)
         {
             std::string statusMessage;
-
             if (bleClient.notifty_index != -1 && bleClient.notifty_index < 4)
             {
                 if (bleClient.notifty_index == 0)
@@ -213,7 +212,6 @@ public:
         }
         if (!bleClient.isConnected())   BLEEvent(false);
         else if (bleClient.isConnected())  BLEEvent(true);
-        else Serial.println("Strange");
 
         delay(50);  // Required for ESP32 to run properly
     }
@@ -280,7 +278,7 @@ private:
             String statusMessage = "status_ac:" + newState;
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
-            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(newState.c_str()));
+            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(newState.c_str()));
             // Save last value to NVS
             saveState("ac_state", statusMessage);
         }
@@ -311,7 +309,7 @@ private:
             String statusMessage = "power_ac: " + power_state;
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
-            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(power_state.c_str()));
+            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(power_state.c_str()));
             // Save last value to NVS
             saveState("ac_power", statusMessage);
         }
@@ -323,7 +321,7 @@ private:
         String statusMessage = "ac_mode: " + mode;
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
-        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(mode.c_str()));
+        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0) /*bleClient.acClient*/, std::string(mode.c_str()));
         // Save last value to NVS
         saveState("ac_mode", statusMessage);
     }
@@ -334,7 +332,7 @@ private:
         String statusMessage = "ac_temp: " + temp;
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
-        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.acClient, std::string(temp.c_str()));
+        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(temp.c_str()));
         // Save last value to NVS
         saveState("ac_temp", statusMessage);
     }

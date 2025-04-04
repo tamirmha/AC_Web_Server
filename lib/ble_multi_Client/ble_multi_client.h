@@ -1,6 +1,8 @@
 #ifndef BLE_MULTI_CLIENT_H
 #define BLE_MULTI_CLIENT_H
 
+#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 4 
+
 #include <NimBLEDevice.h>
 #include <NimBLEScan.h>
 #include <NimBLEAdvertisedDevice.h>
@@ -8,80 +10,111 @@
 #include <vector>
 #include <map>
 #include "Arduino.h"
+#include <unordered_map> // Include for dynamic client storage
 
+// UUIDs for BLE services and characteristics
 #define SERVICE_UUID "5678abcd-0000-1000-8000-00805f9b34fb"
 #define VENT_SPEED_UUID "5678abcd-0001-1000-8000-00805f9b34fb"
 #define MODE_UUID "5678abcd-0002-1000-8000-00805f9b34fb"
 #define STATE_UUID "5678abcd-0003-1000-8000-00805f9b34fb"
 #define TEMP_UUID "5678abcd-0004-1000-8000-00805f9b34fb"
 #define VOLTAGE_UUID "5678abcd-0005-1000-8000-00805f9b34fb"
-//const std::vector<std::string> CHARACTERISTIC_UUIDS = {VENT_SPEED_UUID, MODE_UUID, STATE_UUID, TEMP_UUID, VOLTAGE_UUID};
 
-static const char* AC_MAC = "9c:9e:6e:c1:0c:5e";
-static const char* DUMPER1_MAC = "9c:9e:6e:c1:09:e2";  // Parents room
-static const char* DUMPER2_MAC = "64:e8:33:8c:04:a6";  // WORKING_ROOM_DUMPER
-static const char* DUMPER3_MAC = "64:e8:33:8a:7c:be";  // SAFE_ROOM_DUMPER
+// BLE MAC addresses for specific devices
+static const char* AC_MAC = "9c:9e:6e:c1:0c:5e"; // Air Conditioner
+static const char* DUMPER1_MAC = "9c:9e:6e:c1:09:e2"; // Parents room damper
+static const char* DUMPER2_MAC = "64:e8:33:8c:04:a6"; // Working room damper
+static const char* DUMPER3_MAC = "64:e8:33:8a:7c:be"; // Safe room damper
 
+// Map of damper indices to their corresponding MAC addresses
+static const std::unordered_map<int, std::string> damperMacMap = {
+    {0, AC_MAC},
+    {1, DUMPER1_MAC},
+    {2, DUMPER2_MAC},
+    {3, DUMPER3_MAC}
+};
 
+/**
+ * @class BLEClientMulti
+ * @brief A class to manage multiple BLE client connections and interactions.
+ */
 class BLEClientMulti {
-
-static void notify_characteristic(NimBLERemoteService* pService, const char* characteristic_uuid, std::string& serverMac)
-{
-    // Enable notifications for the characteristic
-    NimBLERemoteCharacteristic* pCharacteristic = pService->getCharacteristic(characteristic_uuid);
-    if (pCharacteristic) {
-        pCharacteristic->subscribe(true, [serverMac](NimBLERemoteCharacteristic* pCharacteristic, const uint8_t* pData, size_t length, bool isNotify)
-        {
-            std::string voltage(reinterpret_cast<const char*>(pData), length);
-            notified = true;
-            per_voltage = voltage;
-
-            // Switch case for different MAC addresses
-            if (serverMac == AC_MAC)            notifty_index = 0;
-            else if (serverMac == DUMPER1_MAC)  notifty_index = 1;
-            else if (serverMac == DUMPER2_MAC)  notifty_index = 2;
-            else if (serverMac == DUMPER3_MAC)  notifty_index = 3;
-            else  Serial.println("Notified from unknown device!");
-
-            Serial.print("Notified Data: ");
-            Serial.println(voltage.c_str());
-            Serial.print("Server MAC: ");
-            Serial.println(serverMac.c_str());
-        });
-        Serial.println("Subscribed to notifications!");
-    }
-    else  Serial.println("Characteristic NOT found!");
-}
-
 public:
-    NimBLEScan* pBLEScan{};
-    NimBLEClient* acClient{};
-    NimBLEClient* d1Client{};
-    NimBLEClient* d2Client{};
-    NimBLEClient* d3Client{};
-    NimBLEAdvertisedDevice* MyAdvertisedDevice{};
-    std::vector<std::string> targetDevices;  // List of target devices to connect to
+    NimBLEScan* pBLEScan{}; ///< Pointer to the BLE scanner instance.
+    std::unordered_map<std::string, NimBLEClient*> clients; ///< Map to store BLE clients by MAC address or identifier.
+    NimBLEAdvertisedDevice* MyAdvertisedDevice{}; ///< Pointer to the currently advertised BLE device.
+    std::vector<std::string> targetDevices; ///< List of target devices to connect to.
+    bool doConnect = false; ///< Flag indicating whether to initiate a connection.
+    static bool notified; ///< Static flag indicating if a notification was received.
+    static std::string per_voltage; ///< Static variable to store the voltage value from the peripheral.
+    static int notifty_index; ///< Static variable to store the index of the notifying device.
 
-    bool doConnect = false;
-    static bool notified;
-    static std::string per_voltage;
-    static int notifty_index;
-//    bool clientConnected = false;  // Flag to check if at least one client is connected
-
+    /**
+     * @brief Constructor for BLEClientMulti.
+     */
     BLEClientMulti();
+
+    /**
+     * @brief Initialize the BLE client and scanner.
+     */
     void init();
+
+    /**
+     * @brief Add a target device to the list of devices to connect to.
+     * @param identifier The identifier (e.g., MAC address) of the target device.
+     */
     void addTargetDevice(const std::string& identifier);
+
+    /**
+     * @brief Start scanning for BLE devices.
+     */
     void startScanning() const;
+
+    /**
+     * @brief Connect to a target BLE device.
+     */
     void connectToDevice();
+
+    /**
+     * @brief Check if the advertised device is a target device.
+     * @param advertisedDevice Pointer to the advertised BLE device.
+     * @return True if the device is a target device, false otherwise.
+     */
     bool isTargetDevice(NimBLEAdvertisedDevice* advertisedDevice);
+
+    /**
+     * @brief Handle the event when a peripheral device is disconnected.
+     * @param pClient Pointer to the BLE client that was disconnected.
+     */
     void onPeripheralDisconnected(NimBLEClient* pClient);
+
+    /**
+     * @brief Check if any BLE client is currently connected.
+     * @return True if a client is connected, false otherwise.
+     */
+    bool isConnected() const;
+
+    /**
+     * @brief Notify a characteristic of a BLE service.
+     * @param pService Pointer to the remote BLE service.
+     * @param characteristic_uuid UUID of the characteristic to notify.
+     * @param serverMac MAC address of the server device.
+     */
+    void notify_characteristic(NimBLERemoteService* pService, const char* characteristic_uuid, std::string& serverMac);
+
+    /**
+     * @brief Get the BLE client for a specific damper by index.
+     * @param damperIndex Index of the damper.
+     * @return Pointer to the BLE client for the damper.
+     */
     NimBLEClient* getClientForDamper(int damperIndex) const;
 
-    bool isConnected() const {
-        return (acClient && acClient->isConnected()) || (d1Client && d1Client->isConnected()) ||
-               (d2Client && d2Client->isConnected()) || (d3Client && d3Client->isConnected());
-    }
-
+    /**
+     * @brief Get the BLE client for a specific identifier (e.g., MAC address).
+     * @param identifier The identifier of the target device.
+     * @return Pointer to the BLE client for the identifier.
+     */
+    NimBLEClient* getClientForIdentifier(const std::string& identifier) const;
 };
 
 #endif

@@ -67,16 +67,13 @@ void BLEClientMulti::startScanning() const {
 }
 
 NimBLEClient* BLEClientMulti::getClientForDamper(int damperIndex) const {
-    switch (damperIndex) {
-        case 1:
-            return d1Client;
-        case 2:
-            return d2Client;
-        case 3:
-            return d3Client;
-        default:
-            return nullptr;
+
+
+    auto it = damperMacMap.find(damperIndex);
+    if (it != damperMacMap.end()) {
+        return getClientForIdentifier(it->second);
     }
+    return nullptr;
 }
 
 void BLEClientMulti::connectToDevice() {
@@ -94,13 +91,15 @@ void BLEClientMulti::connectToDevice() {
                 // Get the server MAC address
                 std::string serverMac = MyAdvertisedDevice->getAddress().toString();
                 notify_characteristic(pRemoteService, VOLTAGE_UUID, serverMac);
-
-                // Switch case for different MAC addresses
-                if (serverMac == AC_MAC)            acClient = pClient;
-                else if (serverMac == DUMPER1_MAC)  d1Client = pClient;
-                else if (serverMac == DUMPER2_MAC)  d2Client = pClient;
-                else if (serverMac == DUMPER3_MAC)  d3Client = pClient;
-                else  Serial.println("Connected to an unknown device.");
+                
+                // Store the client in the map
+                clients[serverMac] = pClient;
+                // // Switch case for different MAC addresses
+                // if (serverMac == AC_MAC)            acClient = pClient;
+                // else if (serverMac == DUMPER1_MAC)  d1Client = pClient;
+                // else if (serverMac == DUMPER2_MAC)  d2Client = pClient;
+                // else if (serverMac == DUMPER3_MAC)  d3Client = pClient;
+                // else  Serial.println("Connected to an unknown device.");
             }
         } else {
             Serial.println("Unable to connect to BLE peripheral.");
@@ -122,9 +121,60 @@ void BLEClientMulti::onPeripheralDisconnected(NimBLEClient* pClient) {
     Serial.println("Handling peripheral disconnection...");
     pClient->disconnect();
     NimBLEDevice::deleteClient(pClient);
+    // Remove the client from the map
+    for (auto it = clients.begin(); it != clients.end(); ++it) {
+        if (it->second == pClient) {
+            Serial.printf("Removing client for device: %s\n", it->first.c_str());
+            clients.erase(it);
+            break;
+        }
+    }
 
-    if (pClient == acClient) acClient = nullptr;
-    else if (pClient == d1Client) d1Client = nullptr;
-    else if (pClient == d2Client) d2Client = nullptr;
-    else if (pClient == d3Client) d3Client = nullptr;
+    // if (pClient == acClient) acClient = nullptr;
+    // else if (pClient == d1Client) d1Client = nullptr;
+    // else if (pClient == d2Client) d2Client = nullptr;
+    // else if (pClient == d3Client) d3Client = nullptr;
+}
+
+bool BLEClientMulti::isConnected() const {
+    for (const auto& pair : clients)
+        {
+        const auto& client = pair.second; // Access the value (client) explicitly
+        if (client && client->isConnected())
+            return true;
+    }   
+    return false;
+}
+
+void BLEClientMulti::notify_characteristic(NimBLERemoteService* pService, const char* characteristic_uuid, std::string& serverMac)
+{
+    // Enable notifications for the characteristic
+    NimBLERemoteCharacteristic* pCharacteristic = pService->getCharacteristic(characteristic_uuid);
+    if (pCharacteristic) {
+        pCharacteristic->subscribe(true, [serverMac](NimBLERemoteCharacteristic* pCharacteristic, const uint8_t* pData, size_t length, bool isNotify)
+        {
+            std::string voltage(reinterpret_cast<const char*>(pData), length);
+            notified = true;
+            per_voltage = voltage;
+
+            // Switch case for different MAC addresses
+            if (serverMac == AC_MAC)            notifty_index = 0;
+            else if (serverMac == DUMPER1_MAC)  notifty_index = 1;
+            else if (serverMac == DUMPER2_MAC)  notifty_index = 2;
+            else if (serverMac == DUMPER3_MAC)  notifty_index = 3;
+            else  Serial.println("Notified from unknown device!");
+
+            Serial.print("Notified Data: ");
+            Serial.println(voltage.c_str());
+            Serial.print("Server MAC: ");
+            Serial.println(serverMac.c_str());
+        });
+        Serial.println("Subscribed to notifications!");
+    }
+    else  Serial.println("Characteristic NOT found!");
+}
+
+NimBLEClient* BLEClientMulti::getClientForIdentifier(const std::string& identifier) const {
+    auto it = clients.find(identifier);
+    return (it != clients.end()) ? it->second : nullptr;
 }
