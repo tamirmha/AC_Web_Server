@@ -9,6 +9,7 @@
 #include <Adafruit_NeoPixel.h> 
 #include <nvs.h>
 #include <nvs_flash.h>
+#include <ESPmDNS.h>
 
 // Pin and pixel configuration for NeoPixel LED
 #define PIN 48
@@ -205,21 +206,24 @@ public:
         WiFi.onEvent(WiFiEvent);
         WiFi.begin(ssid, password);
 
-        while (WiFiClass::status() != WL_CONNECTED) {
+        while (WiFiClass::status() != WL_CONNECTED)
+         {
             delay(500);
             Serial.println("Connecting to WiFi...");
         }
 
         // Serve HTML from SPIFFS
-        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-            if (SPIFFS.exists("/index.html")) {
+        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)    {
+            if (SPIFFS.exists("/index.html")) 
                 request->send(SPIFFS, "/index.html", "text/html");
-            } else {
+            else 
+            {
                 Serial.println("[ERROR] index.html not found in SPIFFS!");
                 request->send(404, "text/plain", "File Not Found");
             }
         });
-
+          // Set hostname
+        if (MDNS.begin("ac-control"))   Serial.println("mDNS responder started");
         // Start Websocket
         webSocket.begin();
         webSocket.onEvent([this](uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
