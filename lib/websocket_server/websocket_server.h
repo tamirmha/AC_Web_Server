@@ -1,5 +1,6 @@
 #ifndef WEBSOCKET_SERVER_H
 #define WEBSOCKET_SERVER_H
+
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <WebSocketsServer.h>
@@ -9,26 +10,37 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 
+// Pin and pixel configuration for NeoPixel LED
 #define PIN 48
 #define NUMPIXELS 1
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
+// Global variable to track Wi-Fi connection status
+bool wifiConnected = false;
 
+/**
+ * @brief Handles Wi-Fi events and updates the NeoPixel LED based on connection status.
+ * 
+ * @param event The Wi-Fi event type.
+ */
 void WiFiEvent(WiFiEvent_t event) {
     switch (event) {
         case SYSTEM_EVENT_STA_CONNECTED:
             Serial.println("WiFi Connected!");
+            wifiConnected = true;
             break;
         case SYSTEM_EVENT_STA_DISCONNECTED:
             Serial.println("WiFi Disconnected!");
-            // Red light when Wi-Fi Not connected
+            wifiConnected = false;
+            // Red light when Wi-Fi is not connected
             pixels.setPixelColor(0, Adafruit_NeoPixel::Color(255, 0, 0)); // Red
             pixels.show();
-            // Your action when Wi-Fi disconnects
             break;
         case SYSTEM_EVENT_STA_GOT_IP:
+            wifiConnected = true;
             Serial.print("WiFi Connected, IP: ");
             Serial.println(WiFi.localIP());
+            // Turn off the LED when connected
             pixels.setPixelColor(0, Adafruit_NeoPixel::Color(0, 0, 0)); // None
             pixels.show();
             pixels.clear();
@@ -38,19 +50,30 @@ void WiFiEvent(WiFiEvent_t event) {
     }
 }
 
-void BLEEvent(bool connected) {
-    // Turn On the blue led when no BLE connected
+/**
+ * @brief Updates the NeoPixel LED based on BLE connection status.
+ * 
+ * @param connected True if BLE is connected, false otherwise.
+ */
+void BLE_connected(bool connected) {
     if (connected) {
+        // Turn off the LED when BLE is connected
         pixels.setPixelColor(0, Adafruit_NeoPixel::Color(0, 0, 0)); // None
         pixels.show();
         pixels.clear();
     } else {
-        // Blue light when BLE Not connected
+        // Blue light when BLE is not connected
         pixels.setPixelColor(0, Adafruit_NeoPixel::Color(0, 0, 255)); // Blue
         pixels.show();
     }
 }
 
+/**
+ * @brief Saves a key-value pair to NVS (Non-Volatile Storage).
+ * 
+ * @param key The key to save.
+ * @param state The value to save.
+ */
 void saveState(const String& key, const String& state) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
@@ -69,6 +92,12 @@ void saveState(const String& key, const String& state) {
     nvs_close(nvs_handle);
 }
 
+/**
+ * @brief Loads a value from NVS based on the given key.
+ * 
+ * @param key The key to retrieve the value for.
+ * @return The value associated with the key, or an empty string if not found.
+ */
 String loadState(const String& key) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
@@ -97,31 +126,36 @@ String loadState(const String& key) {
     return result;
 }
 
-void loadServerData(WebSocketsServer& webSocket)
-{
-    // Load and apply saved states
-    for (int i = 0; i < 3; ++i)
-    {
+/**
+ * @brief Loads saved states from NVS and broadcasts them to WebSocket clients.
+ * 
+ * @param webSocket The WebSocket server instance.
+ */
+void loadServerData(WebSocketsServer& webSocket) {
+    // Load and apply saved states for dampers and AC
+    for (int i = 0; i < 3; ++i) {
         String damperState = loadState("damper" + String(i + 1) + "_state");
-        if (damperState != "")  webSocket.broadcastTXT(damperState);
+        if (damperState != "") webSocket.broadcastTXT(damperState);
 
         String damperPower = loadState("damper" + String(i + 1) + "_power");
         if (damperPower != "") webSocket.broadcastTXT(damperPower);
+
         Serial.println("Loaded states from NVS:");
         Serial.println(damperState);
         Serial.println(damperPower);
     }
+
     String acState = loadState("ac_state");
-    if (acState != "")  webSocket.broadcastTXT(acState);
+    if (acState != "") webSocket.broadcastTXT(acState);
 
     String acPower = loadState("ac_power");
-    if (acPower != "")   webSocket.broadcastTXT(acPower);
+    if (acPower != "") webSocket.broadcastTXT(acPower);
 
     String acMode = loadState("ac_mode");
-    if (acMode != "")  webSocket.broadcastTXT(acMode);
+    if (acMode != "") webSocket.broadcastTXT(acMode);
 
     String acTemp = loadState("ac_temp");
-    if (acTemp != "")   webSocket.broadcastTXT(acTemp);
+    if (acTemp != "") webSocket.broadcastTXT(acTemp);
 
     Serial.println("Loaded states from NVS:");
     Serial.println(acTemp);
@@ -130,11 +164,23 @@ void loadServerData(WebSocketsServer& webSocket)
     Serial.println(acMode);
 }
 
+/**
+ * @brief Class representing an ESP32 WebSocket server with BLE integration.
+ */
 class ESP32WebSocketServer {
 public:
-
+    /**
+     * @brief Constructor for the WebSocket server.
+     * 
+     * @param ssid The Wi-Fi SSID.
+     * @param password The Wi-Fi password.
+     */
     ESP32WebSocketServer(const char* ssid, const char* password)
     : ssid(ssid), password(password), server(80), webSocket(81) {}
+
+    /**
+     * @brief Initializes the WebSocket server, BLE client, and other components.
+     */
     void begin() {
         pixels.begin();
         pixels.clear();
@@ -186,66 +232,64 @@ public:
         bleClient.startScanning();
     }
 
+    /**
+     * @brief Main loop for handling WebSocket and BLE events.
+     */
     void loop() {
         webSocket.loop();
+        ble_loop();
+        delay(50);  // Required for ESP32 to run properly
+    }
+
+private:
+    const char* ssid;  // Wi-Fi SSID
+    const char* password;  // Wi-Fi password
+    AsyncWebServer server;  // HTTP server
+    WebSocketsServer webSocket;  // WebSocket server
+    BLEClientMulti bleClient;  // BLE client for multiple devices
+
+    /**
+     * @brief Handles BLE connection and notification events.
+     */
+    void ble_loop() {
         if(bleClient.doConnect)
         {
             bleClient.connectToDevice();
             bleClient.doConnect = false;
             bleClient.startScanning();
         }
-        if (bleClient.notified)
+        if (bleClient.notified) ble_notified();
+        if (wifiConnected)
         {
-            std::string statusMessage;
-            if (bleClient.notifty_index != -1 && bleClient.notifty_index < 4)
-            {
-                if (bleClient.notifty_index == 0)
-                    statusMessage = "voltage_ac:" + bleClient.per_voltage;
-                else
-                    statusMessage = "voltage_damper" + std::to_string(bleClient.notifty_index) + ":" + bleClient.per_voltage;
-                String statusMessageStr = String(statusMessage.c_str());
-                webSocket.broadcastTXT(statusMessageStr);
-            }
-
-            bleClient.notified = false;
-            bleClient.notifty_index = -1;
+            if (!bleClient.isConnected())   BLE_connected(false);
+            else if (bleClient.isConnected())  BLE_connected(true);
         }
-        if (!bleClient.isConnected())   BLEEvent(false);
-        else if (bleClient.isConnected())  BLEEvent(true);
-
-        delay(50);  // Required for ESP32 to run properly
     }
 
-    void sendDataToPeripheral(const NimBLEUUID CHARACTERISTIC_UUID, NimBLEClient* pClient, const std::string& value = "Hello") const {
-        if (!pClient) {
-            Serial.println("Client NOT connected!");
-            return;
-        }
-        NimBLERemoteService* pService = pClient->getService(SERVICE_UUID);
-        if (pService) {
-            NimBLERemoteCharacteristic* pCharacteristic = pService->getCharacteristic(CHARACTERISTIC_UUID);
-            if (pCharacteristic)
-            {
-                // Replace with the data you want to send
-                pCharacteristic->writeValue(value);
-                Serial.print("Data sent to peripheral! UUID: ");
-                Serial.print(CHARACTERISTIC_UUID.toString().c_str());
-                Serial.print("! Value ");
-                Serial.println(value.c_str());
-            }
+    /**
+     * @brief Handles BLE notifications and broadcasts them to WebSocket clients.
+     */
+    void ble_notified() {
+        std::string statusMessage;
+        if (bleClient.notifty_index != -1 && bleClient.notifty_index < 4)
+        {
+            if (bleClient.notifty_index == 0)
+                statusMessage = "voltage_ac:" + bleClient.per_voltage;
             else
-                Serial.println("Characteristic NOT found!");
-        } else
-            Serial.println("Service NOT found!");
+                statusMessage = "voltage_damper" + std::to_string(bleClient.notifty_index) + ":" + bleClient.per_voltage;
+            String statusMessageStr = String(statusMessage.c_str());
+            webSocket.broadcastTXT(statusMessageStr);
+        }
+
+        bleClient.notified = false;
+        bleClient.notifty_index = -1;
     }
 
-private:
-    const char* ssid;
-    const char* password;
-    AsyncWebServer server;
-    WebSocketsServer webSocket;
-    BLEClientMulti bleClient;
-    
+    /**
+     * @brief Toggles the state of a damper or AC based on WebSocket messages.
+     * 
+     * @param message The WebSocket message.
+     */
     void toggleButton(const String& message) {
         NimBLEUUID CHARACTERISTIC_UUID = NimBLEUUID(STATE_UUID);
 
@@ -284,6 +328,12 @@ private:
         }
     
     }
+
+    /**
+     * @brief Sets the power level of a damper or AC based on WebSocket messages.
+     * 
+     * @param message The WebSocket message.
+     */
     void powerButton(const String& message) {
         // Low, Medium, High, Auto
         // Send message to WebSocket clients
@@ -314,8 +364,13 @@ private:
             saveState("ac_power", statusMessage);
         }
     }
-    void acMode(const String& message)
-    { // Heat or cold
+
+    /**
+     * @brief Sets the AC mode (e.g., heat or cold) based on WebSocket messages.
+     * 
+     * @param message The WebSocket message.
+     */
+    void acMode(const String& message) { // Heat or cold
         NimBLEUUID CHARACTERISTIC_UUID = NimBLEUUID(MODE_UUID);
         String mode = message.substring(12);
         String statusMessage = "ac_mode: " + mode;
@@ -325,8 +380,13 @@ private:
         // Save last value to NVS
         saveState("ac_mode", statusMessage);
     }
-    void acTemp(const String& message)
-    {
+
+    /**
+     * @brief Sets the AC temperature based on WebSocket messages.
+     * 
+     * @param message The WebSocket message.
+     */
+    void acTemp(const String& message) {
         NimBLEUUID CHARACTERISTIC_UUID = NimBLEUUID(TEMP_UUID);
         String temp = message.substring(12);
         String statusMessage = "ac_temp: " + temp;
@@ -336,6 +396,14 @@ private:
         // Save last value to NVS
         saveState("ac_temp", statusMessage);
     }
+
+    /**
+     * @brief Handles incoming WebSocket messages.
+     * 
+     * @param num The WebSocket client number.
+     * @param payload The message payload.
+     * @param length The length of the payload.
+     */
     void handleWebSocketMessage(uint8_t num, uint8_t* payload, size_t length) {
         String message = String((char*)payload);
         Serial.println(message.c_str());
@@ -350,11 +418,51 @@ private:
         else
             Serial.println("Unknown message received!");       
     } 
+
+    /**
+     * @brief Handles WebSocket events such as connection and message reception.
+     * 
+     * @param num The WebSocket client number.
+     * @param type The type of WebSocket event.
+     * @param payload The event payload.
+     * @param length The length of the payload.
+     */
     void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
         if (type == WStype_CONNECTED)   loadServerData(webSocket);
         if (type == WStype_TEXT)   handleWebSocketMessage(num, payload, length);
 
     } 
+
+    /**
+     * @brief Sends data to a BLE peripheral.
+     * 
+     * @param CHARACTERISTIC_UUID The UUID of the BLE characteristic.
+     * @param pClient The BLE client instance.
+     * @param value The value to send.
+     */
+    void sendDataToPeripheral(const NimBLEUUID CHARACTERISTIC_UUID, NimBLEClient* pClient, const std::string& value = "Hello") const {
+        if (!pClient) {
+            Serial.println("Client NOT connected!");
+            return;
+        }
+        NimBLERemoteService* pService = pClient->getService(SERVICE_UUID);
+        if (pService) {
+            NimBLERemoteCharacteristic* pCharacteristic = pService->getCharacteristic(CHARACTERISTIC_UUID);
+            if (pCharacteristic)
+            {
+                // Replace with the data you want to send
+                pCharacteristic->writeValue(value);
+                Serial.print("Data sent to peripheral! UUID: ");
+                Serial.print(CHARACTERISTIC_UUID.toString().c_str());
+                Serial.print("! Value ");
+                Serial.println(value.c_str());
+            }
+            else
+                Serial.println("Characteristic NOT found!");
+        } else
+            Serial.println("Service NOT found!");
+    }
+
 };
 
 #endif // WEBSOCKET_SERVER_H
