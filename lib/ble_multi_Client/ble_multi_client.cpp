@@ -25,13 +25,8 @@ private:
 
 class ClientCallbacks : public NimBLEClientCallbacks {
 public:
-//    ClientCallbacks()= default;
     explicit ClientCallbacks(BLEClientMulti* parent) : _parent(parent){}
-
-    void onConnect(NimBLEClient* pClient) override {
-        Serial.println("Connected to the server.");
-    }
-
+    void onConnect(NimBLEClient* pClient) override {Serial.println("Connected to the server.");}
     void onDisconnect(NimBLEClient* pClient, int reason) override {
         Serial.println("Disconnected from the server.");
         _parent->onPeripheralDisconnected(pClient);
@@ -49,10 +44,12 @@ BLEClientMulti::BLEClientMulti()= default;
 void BLEClientMulti::init() {
     Serial.println("Initializing BLE Client...");
     // add target devices - using MAC addresses
-    addTargetDevice(AC_MAC);        // Add target BLE device by name or MAC
-    addTargetDevice(DUMPER1_MAC);   // Add target BLE device by name or MAC
-    addTargetDevice(DUMPER2_MAC);   // Add target BLE device by name or MAC
-    addTargetDevice(DUMPER3_MAC);   // Add target BLE device by name or MAC
+    addTargetDevice(AC_MAC);        
+    addTargetDevice(DUMPER1_MAC);   
+    addTargetDevice(DUMPER2_MAC);   
+    addTargetDevice(DUMPER3_MAC);   
+    addTargetDevice(TEST1_MAC);     
+    addTargetDevice(TEST2_MAC);     
     NimBLEDevice::init("BLE MASTER - AC Remote Server");
     pBLEScan = NimBLEDevice::getScan();
     pBLEScan->setScanCallbacks(new ScanCallbacks(this)); // Corrected function call
@@ -91,15 +88,8 @@ void BLEClientMulti::connectToDevice() {
                 // Get the server MAC address
                 std::string serverMac = MyAdvertisedDevice->getAddress().toString();
                 notify_characteristic(pRemoteService, VOLTAGE_UUID, serverMac);
-                
                 // Store the client in the map
                 clients[serverMac] = pClient;
-                // // Switch case for different MAC addresses
-                // if (serverMac == AC_MAC)            acClient = pClient;
-                // else if (serverMac == DUMPER1_MAC)  d1Client = pClient;
-                // else if (serverMac == DUMPER2_MAC)  d2Client = pClient;
-                // else if (serverMac == DUMPER3_MAC)  d3Client = pClient;
-                // else  Serial.println("Connected to an unknown device.");
             }
         } else {
             Serial.println("Unable to connect to BLE peripheral.");
@@ -129,11 +119,6 @@ void BLEClientMulti::onPeripheralDisconnected(NimBLEClient* pClient) {
             break;
         }
     }
-
-    // if (pClient == acClient) acClient = nullptr;
-    // else if (pClient == d1Client) d1Client = nullptr;
-    // else if (pClient == d2Client) d2Client = nullptr;
-    // else if (pClient == d3Client) d3Client = nullptr;
 }
 
 bool BLEClientMulti::isConnected() const {
@@ -162,6 +147,8 @@ void BLEClientMulti::notify_characteristic(NimBLERemoteService* pService, const 
             else if (serverMac == DUMPER1_MAC)  notifty_index = 1;
             else if (serverMac == DUMPER2_MAC)  notifty_index = 2;
             else if (serverMac == DUMPER3_MAC)  notifty_index = 3;
+            else if (serverMac == TEST1_MAC)    notifty_index = 4;
+            else if (serverMac == TEST2_MAC)    notifty_index = 5;
             else  Serial.println("Notified from unknown device!");
 
             Serial.print("Notified Data: ");

@@ -25,13 +25,18 @@ static const char* AC_MAC = "9c:9e:6e:c1:0c:5e"; // Air Conditioner
 static const char* DUMPER1_MAC = "9c:9e:6e:c1:09:e2"; // Parents room damper
 static const char* DUMPER2_MAC = "64:e8:33:8c:04:a6"; // Working room damper
 static const char* DUMPER3_MAC = "64:e8:33:8a:7c:be"; // Safe room damper
+static const char* TEST1_MAC = "DC:06:75:E9:6F:92"; // Redundant Controller
+static const char* TEST2_MAC = "DC:06:75:E9:3C:02"; // Tests Controller
+
 
 // Map of damper indices to their corresponding MAC addresses
 static const std::unordered_map<int, std::string> damperMacMap = {
     {0, AC_MAC},
     {1, DUMPER1_MAC},
     {2, DUMPER2_MAC},
-    {3, DUMPER3_MAC}
+    {3, DUMPER3_MAC},
+    {4, TEST1_MAC},
+    {5, TEST2_MAC}
 };
 
 /**
