@@ -1,13 +1,20 @@
 #include <websocket_server.h>
+#include <my_blynk.h>
 
-ESP32WebSocketServer socket_server("Galaxy", "pnml6201");
+ESP32WebSocketServer socket_server(ssid, pass);
 
 void setup() 
 {
   socket_server.begin();
+#if USE_BLYNK == true
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+#endif
 }
 
 void loop()
 {
-  socket_server.loop();
+#if USE_BLYNK == true
+    Blynk.run();
+#endif
+    socket_server.loop();
 }

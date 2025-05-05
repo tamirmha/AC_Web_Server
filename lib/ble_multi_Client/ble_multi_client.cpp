@@ -53,7 +53,7 @@ void BLEClientMulti::init() {
     addTargetDevice(DUMPER1_MAC);   // Add target BLE device by name or MAC
     addTargetDevice(DUMPER2_MAC);   // Add target BLE device by name or MAC
     addTargetDevice(DUMPER3_MAC);   // Add target BLE device by name or MAC
-    NimBLEDevice::init("BLE MASTER - WebSocket Server");
+    NimBLEDevice::init("BLE MASTER - AC Remote Server");
     pBLEScan = NimBLEDevice::getScan();
     pBLEScan->setScanCallbacks(new ScanCallbacks(this)); // Corrected function call
     pBLEScan->setActiveScan(true);
