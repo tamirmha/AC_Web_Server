@@ -17,4 +17,5 @@ void loop()
     Blynk.run();
 #endif
     socket_server.loop();
+delay(50);  // Required for ESP32 to run properly
 }

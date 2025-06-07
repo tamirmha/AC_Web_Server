@@ -59,10 +59,10 @@ void BLE_connected(bool connected) {
  * @param pClient The BLE client instance.
  * @param value The value to send.
  */
-void sendDataToPeripheral(const NimBLEUUID CHARACTERISTIC_UUID, NimBLEClient* pClient, const std::string& value = "Hello") {
+bool sendDataToPeripheral(const NimBLEUUID CHARACTERISTIC_UUID, NimBLEClient* pClient, const std::string& value = "Hello") {
     if (!pClient) {
         Serial.println("Client NOT connected!");
-        return;
+        return false;
     }
     NimBLERemoteService* pService = pClient->getService(SERVICE_UUID);
     if (pService) {
@@ -71,27 +71,28 @@ void sendDataToPeripheral(const NimBLEUUID CHARACTERISTIC_UUID, NimBLEClient* pC
         {
             // Replace with the data you want to send
             pCharacteristic->writeValue(value);
-            Serial.print("Data sent to peripheral! UUID: ");
-            Serial.print(CHARACTERISTIC_UUID.toString().c_str());
-            Serial.print("! Value ");
-            Serial.println(value.c_str());
+            Serial.printf("Data sent to peripheral! UUID: %s! Value: %s\n", CHARACTERISTIC_UUID.toString().c_str(), value.c_str());
+            return true;
         }
         else
             Serial.println("Characteristic NOT found!");
     } else
         Serial.println("Service NOT found!");
+    return false;   
 }
 
 /**
  * @brief Handles BLE notifications and broadcasts them to WebSocket clients.
  */
 void ble_notified(WebSocketsServer& webSocket) {
-    std::string statusMessage;
     if (bleClient.notifty_index != -1 && bleClient.notifty_index < 4)
     {
 #if USE_BLYNK == true
+        Serial.printf("Blynk virtual write: %d. Data: %s\n", VOLTAGE_START_PIN + bleClient.notifty_index, bleClient.per_voltage.c_str()); 
         Blynk.virtualWrite(VOLTAGE_START_PIN + bleClient.notifty_index , atof(bleClient.per_voltage.c_str()));
+        delay(100); // Delay to ensure Blynk processes the write
 #else
+        std::string statusMessage;
         if (bleClient.notifty_index == 0)   statusMessage = "voltage_ac:" + bleClient.per_voltage;
         else    statusMessage = "voltage_damper" + std::to_string(bleClient.notifty_index) + ":" + bleClient.per_voltage;
         String statusMessageStr = String(statusMessage.c_str());
@@ -101,10 +102,13 @@ void ble_notified(WebSocketsServer& webSocket) {
     bleClient.notified = false;
     bleClient.notifty_index = -1;
 }
+
+// static unsigned long lastBlynkUpdate = 0;
 /**
     * @brief Handles BLE connection and notification events.
     */
 void ble_loop(WebSocketsServer& webSocket) {
+
     if(bleClient.doConnect)
     {
         bleClient.connectToDevice();
@@ -112,10 +116,22 @@ void ble_loop(WebSocketsServer& webSocket) {
         bleClient.startScanning();
     }
     if (bleClient.notified) ble_notified(webSocket);
+    
+    // unsigned long currentTime = millis();
+    
+    // // Update Blynk every 10 seconds
+    // if (currentTime - lastBlynkUpdate >= 10000) {
+    //     Serial.println(bleClient.WORKING_ROOM_DUMPER_CONNECTED ? "Working room damper connected!" : "Working room damper NOT connected!");
+    //     Serial.println(bleClient.PARENTS_ROOM_DUMPER_CONNECTED ? "Parents room damper connected!" : "Parents room damper NOT connected!");
+    //     Serial.println(bleClient.SAFE_ROOM_DUMPER_CONNECTED ? "Safe room damper connected!" : "Safe room damper NOT connected!"); 
+    //     Serial.println(bleClient.AC_CONNECTED ? "AC connected!" : "AC NOT connected!");
+    //     lastBlynkUpdate = currentTime;
+    // }
+
     if (wifiConnected)
     {
-        if (!bleClient.isConnected())   BLE_connected(false);
-        else if (bleClient.isConnected())  BLE_connected(true);
+        if (!bleClient.isConnected())       BLE_connected(false);
+        else if (bleClient.isConnected())   BLE_connected(true);
     }
 }
 

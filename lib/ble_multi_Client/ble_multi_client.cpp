@@ -26,11 +26,11 @@ private:
 class ClientCallbacks : public NimBLEClientCallbacks {
 public:
     explicit ClientCallbacks(BLEClientMulti* parent) : _parent(parent){}
-    void onConnect(NimBLEClient* pClient) override {
-        Serial.println("Connected to the server.");
-    }
+    // void onConnect(NimBLEClient* pClient) override {
+    //     Serial.println("Connected to the server.");
+    // }
     void onDisconnect(NimBLEClient* pClient, int reason) override {
-        Serial.println("Disconnected from the server.");
+        // Serial.println("Disconnected from the server.");
         _parent->onPeripheralDisconnected(pClient);
     }
 private:
@@ -67,10 +67,7 @@ void BLEClientMulti::startScanning() const {
 
 NimBLEClient* BLEClientMulti::getClientForDamper(int damperIndex) const {
     auto it = damperMacMap.find(damperIndex);
-    // Serial.printf("Searching for damper %d in map...\n", damperIndex);
-    // Serial.println(it->second.c_str());
     if (it != damperMacMap.end())   return getClientForIdentifier(it->second);
-    
     return nullptr;
 }
 
@@ -81,22 +78,35 @@ void BLEClientMulti::connectToDevice() {
         pClient = NimBLEDevice::createClient();
         pClient->setClientCallbacks(new ClientCallbacks(this)); // Set client callbacks
         if (pClient->connect(MyAdvertisedDevice, true)) {
-            // Serial.println("Connected to BLE peripheral.");
             NimBLERemoteService* pRemoteService = pClient->getService(SERVICE_UUID);
 
             if (pRemoteService) {
-                // Serial.println("Service UUID set.");
                 // Get the server MAC address
                 std::string serverMac = MyAdvertisedDevice->getAddress().toString();
                 notify_characteristic(pRemoteService, VOLTAGE_UUID, serverMac);
                 // Store the client in the map
                 std::string server_name = getIndexFromMac(serverMac);
-                if (server_name=="AC") AC_CONNECTED = true; 
-                else if (server_name=="PARENTS_ROOM_DUMPER") PARENTS_ROOM_DUMPER_CONNECTED = true;
-                else if (server_name=="WORKING_ROOM_DUMPER") WORKING_ROOM_DUMPER_CONNECTED = true;
-                else if (server_name=="SAFE_ROOM_DUMPER") SAFE_ROOM_DUMPER_CONNECTED = true;
+                // if (server_name=="AC") AC_CONNECTED = true; 
+                // else if (server_name=="PARENTS_ROOM_DUMPER") PARENTS_ROOM_DUMPER_CONNECTED = true;
+                // else if (server_name=="WORKING_ROOM_DUMPER") WORKING_ROOM_DUMPER_CONNECTED = true;
+                // else if (server_name=="SAFE_ROOM_DUMPER") SAFE_ROOM_DUMPER_CONNECTED = true;
                 Serial.printf("Adding client for device: %s\n", server_name.c_str());
                 clients[serverMac] = pClient;
+
+                int i = -1;          
+                if (server_name=="AC") i = 0; 
+                else if (server_name=="PARENTS_ROOM_DUMPER") i = 1;
+                else if (server_name=="WORKING_ROOM_DUMPER") i = 2;
+                else if (server_name=="SAFE_ROOM_DUMPER") i = 3;;
+                if (pendingCommands[i].pending) 
+                {
+                    NimBLERemoteCharacteristic* pChar = pRemoteService->getCharacteristic(pendingCommands[i].characteristicUUID);
+                    if (pChar) {
+                        pChar->writeValue(pendingCommands[i].value);
+                        Serial.println("Executed pending command");
+                        pendingCommands[i].pending = false;
+                    }
+                }
             }
         } else {
             Serial.println("Unable to connect to BLE peripheral.");
@@ -115,17 +125,17 @@ bool BLEClientMulti::isTargetDevice(NimBLEAdvertisedDevice* advertisedDevice) {
 
 // New method to handle peripheral disconnection
 void BLEClientMulti::onPeripheralDisconnected(NimBLEClient* pClient) {
-    Serial.println("Handling peripheral disconnection...");
+    // Serial.println("Handling peripheral disconnection...");
     pClient->disconnect();
     NimBLEDevice::deleteClient(pClient);
     // Remove the client from the map
     for (auto it = clients.begin(); it != clients.end(); ++it) {
         if (it->second == pClient) {
-            Serial.printf("Removing client for device: %s\n", it->first.c_str());
-            if (it->first == "AC") AC_CONNECTED  = false;
-            else if (it->first == "PARENTS_ROOM_DUMPER") PARENTS_ROOM_DUMPER_CONNECTED = false;
-            else if (it->first == "WORKING_ROOM_DUMPER") WORKING_ROOM_DUMPER_CONNECTED = false;
-            else if (it->first == "SAFE_ROOM_DUMPER") SAFE_ROOM_DUMPER_CONNECTED = false;
+            // Serial.printf("Removing client for device: %s\n", it->first.c_str());
+            // if (it->first == "AC") AC_CONNECTED  = false;
+            // else if (it->first == "PARENTS_ROOM_DUMPER") PARENTS_ROOM_DUMPER_CONNECTED = false;
+            // else if (it->first == "WORKING_ROOM_DUMPER") WORKING_ROOM_DUMPER_CONNECTED = false;
+            // else if (it->first == "SAFE_ROOM_DUMPER") SAFE_ROOM_DUMPER_CONNECTED = false;
             clients.erase(it);
             break;
         }
@@ -167,7 +177,6 @@ void BLEClientMulti::notify_characteristic(NimBLERemoteService* pService, const 
             Serial.print("Server MAC: ");
             Serial.println(serverMac.c_str());
         });
-        Serial.println("Subscribed to notifications!");
     }
     else  Serial.println("Characteristic NOT found!");
 }

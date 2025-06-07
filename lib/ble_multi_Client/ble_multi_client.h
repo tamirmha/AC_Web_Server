@@ -39,6 +39,15 @@ static const std::unordered_map<int, std::string> damperMacMap = {
     {5, TEST2_MAC}
 };
 
+struct PendingCommand {
+    NimBLEUUID characteristicUUID;
+    std::string value;
+    bool pending;
+};
+
+#define MAX_CLIENTS 4  // Adjust based on your max number of BLE clients
+
+
 /**
  * @class BLEClientMulti
  * @brief A class to manage multiple BLE client connections and interactions.
@@ -53,10 +62,12 @@ public:
     static bool notified; ///< Static flag indicating if a notification was received.
     static std::string per_voltage; ///< Static variable to store the voltage value from the peripheral.
     static int notifty_index; ///< Static variable to store the index of the notifying device.
-    bool AC_CONNECTED = false; // Flag to track if AC is connected
-    bool PARENTS_ROOM_DUMPER_CONNECTED = false; // Flag to track if Parents room damper is connected
-    bool WORKING_ROOM_DUMPER_CONNECTED = false; // Flag to track if Working room damper is connected
-    bool SAFE_ROOM_DUMPER_CONNECTED = false; // Flag to track if Safe room damper is connected
+    PendingCommand pendingCommands[MAX_CLIENTS];
+
+    // bool AC_CONNECTED = false; // Flag to track if AC is connected
+    // bool PARENTS_ROOM_DUMPER_CONNECTED = false; // Flag to track if Parents room damper is connected
+    // bool WORKING_ROOM_DUMPER_CONNECTED = false; // Flag to track if Working room damper is connected
+    // bool SAFE_ROOM_DUMPER_CONNECTED = false; // Flag to track if Safe room damper is connected
     /**
      * @brief Constructor for BLEClientMulti.
      */

@@ -154,7 +154,13 @@ private:
                 webSocket.broadcastTXT(statusMessage);
                 Serial.println(statusMessage.c_str());
                 NimBLEClient* pClient = bleClient.getClientForDamper(damperIndex+1);
-                sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(newState.c_str()));
+                if (!sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(newState.c_str())))
+                { 
+                    bleClient.pendingCommands[damperIndex+1].characteristicUUID = CHARACTERISTIC_UUID;
+                    bleClient.pendingCommands[damperIndex+1].value = std::string(newState.c_str());
+                    bleClient.pendingCommands[damperIndex+1].pending = true;
+                    Serial.println("Command stored for later execution");
+                }
                 // Save last value to NVS
                 saveState("damper" + String(damperIndex + 1) + "_state", statusMessage);
 
@@ -168,7 +174,13 @@ private:
             String statusMessage = "status_ac:" + newState;
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
-            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(newState.c_str()));
+            if (!sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(newState.c_str())))
+            { 
+                bleClient.pendingCommands[0].characteristicUUID = CHARACTERISTIC_UUID;
+                bleClient.pendingCommands[0].value = std::string(newState.c_str());
+                bleClient.pendingCommands[0].pending = true;
+                Serial.println("Command stored for later execution");
+            }
             // Save last value to NVS
             saveState("ac_state", statusMessage);
         }
@@ -194,7 +206,15 @@ private:
             String statusMessage = "power_damper" + String(damperIndex + 1) + ":" + power_state;
             webSocket.broadcastTXT(statusMessage);
             NimBLEClient* pClient = bleClient.getClientForDamper(damperIndex+1);
-            sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(power_state.c_str()));
+            // sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(power_state.c_str()));
+            if (!sendDataToPeripheral(CHARACTERISTIC_UUID, pClient, std::string(power_state.c_str())))
+            { 
+                bleClient.pendingCommands[damperIndex+1].characteristicUUID = CHARACTERISTIC_UUID;
+                bleClient.pendingCommands[damperIndex+1].value = std::string(power_state.c_str());
+                bleClient.pendingCommands[damperIndex+1].pending = true;
+                Serial.println("Command stored for later execution");
+            }
+
             // Save last value to NVS
             saveState("damper" + String(damperIndex + 1) + "_power", statusMessage);
         }
@@ -205,7 +225,15 @@ private:
             String statusMessage = "power_ac: " + power_state;
             webSocket.broadcastTXT(statusMessage);
             // Send to BLE Peripheral
-            sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(power_state.c_str()));
+            // sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(power_state.c_str()));
+            if (!sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(power_state.c_str())))
+            { 
+                bleClient.pendingCommands[0].characteristicUUID = CHARACTERISTIC_UUID;
+                bleClient.pendingCommands[0].value = std::string(power_state.c_str());
+                bleClient.pendingCommands[0].pending = true;
+                Serial.println("Command stored for later execution");
+            }
+            
             // Save last value to NVS
             saveState("ac_power", statusMessage);
         }
@@ -222,7 +250,14 @@ private:
         String statusMessage = "ac_mode: " + mode;
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
-        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0) /*bleClient.acClient*/, std::string(mode.c_str()));
+        // sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(mode.c_str()));
+        if (!sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(mode.c_str())))
+        { 
+            bleClient.pendingCommands[0].characteristicUUID = CHARACTERISTIC_UUID;
+            bleClient.pendingCommands[0].value = std::string(mode.c_str());
+            bleClient.pendingCommands[0].pending = true;
+            Serial.println("Command stored for later execution");
+        }
         // Save last value to NVS
         saveState("ac_mode", statusMessage);
     }
@@ -238,7 +273,14 @@ private:
         String statusMessage = "ac_temp: " + temp;
         webSocket.broadcastTXT(statusMessage);
         // Send to BLE Peripheral
-        sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(temp.c_str()));
+        // sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0)/*bleClient.acClient*/, std::string(temp.c_str()));
+        if (!sendDataToPeripheral(CHARACTERISTIC_UUID, bleClient.getClientForDamper(0), std::string(temp.c_str())))
+        { 
+            bleClient.pendingCommands[0].characteristicUUID = CHARACTERISTIC_UUID;
+            bleClient.pendingCommands[0].value = std::string(temp.c_str());
+            bleClient.pendingCommands[0].pending = true;
+            Serial.println("Command stored for later execution");
+        }
         // Save last value to NVS
         saveState("ac_temp", statusMessage);
     }
