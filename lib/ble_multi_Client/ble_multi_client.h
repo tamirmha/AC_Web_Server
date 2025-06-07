@@ -21,20 +21,20 @@
 #define VOLTAGE_UUID "5678abcd-0005-1000-8000-00805f9b34fb"
 
 // BLE MAC addresses for specific devices
-static const char* AC_MAC = "9c:9e:6e:c1:0c:5e"; // Air Conditioner
-static const char* DUMPER1_MAC = "9c:9e:6e:c1:09:e2"; // Parents room damper
-static const char* DUMPER2_MAC = "64:e8:33:8c:04:a6"; // Working room damper
-static const char* DUMPER3_MAC = "64:e8:33:8a:7c:be"; // Safe room damper
-static const char* TEST1_MAC = "DC:06:75:E9:6F:92"; // Redundant Controller
-static const char* TEST2_MAC = "DC:06:75:E9:3C:02"; // Tests Controller
+static const char* AC_MAC = "64:e8:33:8c:04:a6"; // Air Conditioner
+static const char* PARENTS_ROOM_DUMPER_MAC = "9c:9e:6e:c1:09:e2"; // Parents room damper
+static const char* WORKING_ROOM_DUMPER_MAC = "9c:9e:6e:c1:0c:5e"; // Working room damper
+static const char* TEST1_MAC = "64:e8:33:8a:7c:be"; // Safe room damper
+static const char* TEST2_MAC = "DC:06:75:E9:6F:92"; // Redundant Controller
+static const char* SAFE_ROOM_DUMPER_MAC = "DC:06:75:E9:3C:02"; // Tests Controller
 
 
 // Map of damper indices to their corresponding MAC addresses
 static const std::unordered_map<int, std::string> damperMacMap = {
     {0, AC_MAC},
-    {1, DUMPER1_MAC},
-    {2, DUMPER2_MAC},
-    {3, DUMPER3_MAC},
+    {1, PARENTS_ROOM_DUMPER_MAC},
+    {2, WORKING_ROOM_DUMPER_MAC},
+    {3, SAFE_ROOM_DUMPER_MAC},
     {4, TEST1_MAC},
     {5, TEST2_MAC}
 };
@@ -53,7 +53,10 @@ public:
     static bool notified; ///< Static flag indicating if a notification was received.
     static std::string per_voltage; ///< Static variable to store the voltage value from the peripheral.
     static int notifty_index; ///< Static variable to store the index of the notifying device.
-
+    bool AC_CONNECTED = false; // Flag to track if AC is connected
+    bool PARENTS_ROOM_DUMPER_CONNECTED = false; // Flag to track if Parents room damper is connected
+    bool WORKING_ROOM_DUMPER_CONNECTED = false; // Flag to track if Working room damper is connected
+    bool SAFE_ROOM_DUMPER_CONNECTED = false; // Flag to track if Safe room damper is connected
     /**
      * @brief Constructor for BLEClientMulti.
      */
@@ -120,6 +123,30 @@ public:
      * @return Pointer to the BLE client for the identifier.
      */
     NimBLEClient* getClientForIdentifier(const std::string& identifier) const;
+
+    /**
+     * @brief Get the index for a given MAC address
+     * @param mac The MAC address to look up in the damperMacMap
+     * @return The index corresponding to the MAC address, or -1 if not found
+     */
+    static std::string getIndexFromMac(const std::string& mac) {
+        for (const auto& pair : damperMacMap) {
+            if (pair.second == mac) 
+            {
+                switch (pair.first) {
+                    case 0:
+                        return "AC"; // 
+                    case 1:
+                        return "PARENTS_ROOM_DUMPER"; // Parents room damper
+                    case 2:
+                        return "WORKING_ROOM_DUMPER"; // Working room damper    
+                    case 3: 
+                        return "SAFE_ROOM_DUMPER_MAC"; // Safe room damper 
+                }
+            }
+        }
+        return "None";
+    }
 };
 
 #endif

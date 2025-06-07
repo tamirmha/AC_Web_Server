@@ -55,4 +55,5 @@ BLYNK_WRITE(VPIN_AC_STATE) {
     sendDataToPeripheral(NimBLEUUID(STATE_UUID), bleClient.getClientForDamper(VPIN_POWER), param.asInt() ? "on" : "off");
 }
 
+
 #endif //MYBLYNK_H
